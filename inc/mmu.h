@@ -144,6 +144,33 @@
 	.byte (((base) >> 16) & 0xff), (0x90 | (type)),		\
 		(0xC0 | (((lim) >> 28) & 0xf)), (((base) >> 24) & 0xff)
 
+//.word defines 2 numbers, total size is 4 bytes.
+//.byte defines 4 numbers, total size is 4 bytes.
+//
+// 0x90(1001 000) set Pr(1bit)=1. which must be 1 for all valid selectors.
+//                set Privl(2bits)=0. Privileg, 0 is the highest.
+// 0xc0(1100 000) set Gr(1bit)=1. Granularity, if equals 0, then limit is in 1 B blocks.
+//                                Otherwise, in 4 KiB blocks.
+//                set Sz(1bit)=1. 0, defines 16 bit protected mode. 1, 32 bit.
+//                                You can have both.                   
+// for code seg
+// 31...0
+// 00 00 ff ff
+// 63...32
+// 00 cf 9a ff
+//
+// its base is 0, limit is 4G, Readable and excutable.
+//
+//
+// for data seg
+// 31...0
+// 00 00 ff ff
+// 63...32
+// 00 cf 92 ff
+//
+// its base is 0, limit is 4G, Writeable and unexcutable.
+
+
 #else	// not __ASSEMBLER__
 
 #include <inc/types.h>
