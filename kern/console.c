@@ -192,6 +192,7 @@ cga_putc(int c)
 	}
 
 	// What is the purpose of this?
+	// 考虑到屏幕盛不下，溢出情况，会移动显示内存
 	if (crt_pos >= CRT_SIZE) {
 		int i;
 
