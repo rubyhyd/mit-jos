@@ -38,6 +38,15 @@
 // offset in page
 #define PGOFF(la)	(((uintptr_t) (la)) & 0xFFF)
 
+// address in 4M page table entry
+#define PTE4M(va) (((uintptr_t) (va)) & 0xffc00000)
+
+// offset in 4m page
+#define PGOFF4M(va) (((uintptr_t) (va)) & 0x3fffff)
+
+// pa in 4m page
+//#define PG4MADDR(d, t) ((physaddr_t)d | (physaddr_t)t)
+
 // construct linear address from indexes and offset
 #define PGADDR(d, t, o)	((void*) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 
@@ -47,7 +56,7 @@
 
 #define PGSIZE		4096		// bytes mapped by a page
 #define PGSHIFT		12		// log2(PGSIZE)
-#define PGSIZE4M  4096 * 1024
+#define PGSIZE4M  (4096 * 1024)
 
 #define PTSIZE		(PGSIZE*NPTENTRIES) // bytes mapped by a page directory entry
 #define PTSHIFT		22		// log2(PTSIZE)

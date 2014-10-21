@@ -176,6 +176,9 @@ mem_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
+	int i = 0;
+	
+
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -189,6 +192,7 @@ mem_init(void)
 	// Your code goes here:
 	boot_map_region(kern_pgdir, UPAGES, 
 		npages * sizeof(struct PageInfo), PADDR(pages), PTE_W | PTE_P);	
+
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -217,6 +221,7 @@ mem_init(void)
 	check_kern_pgdir();
 	boot_map_region_4m(kern_pgdir, KERNBASE, 0xffffffff - KERNBASE, 0, PTE_P | PTE_W);
 	check_kern_pgdir_4m();
+
 	// Switch from the minimal entry page directory to the full kern_pgdir
 	// page table we just created.	Our instruction pointer should be
 	// somewhere between KERNBASE and KERNBASE+4MB right now, which is
@@ -407,6 +412,11 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	//cprintf("walk\n");
 	pte_t* pde = & pgdir[PDX(va)];			// point to entry in page dir
 	pte_t* pt = 0;											// point to the page table
+	
+	//cprintf("walk: *pde is 0x%x\n", *pde);
+	if (*pde & PTE_PS)
+		return pde;
+
 	if (*pde & PTE_P) {
 		pt = page2kva(pa2page(PTE_ADDR(*pde)));
 		// cprintf("walk: pde is 0x%x\n", pde);
@@ -414,6 +424,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		// cprintf("walk: return is 0x%x\n", & pt[PTX(va)]);		
 		return & pt[PTX(va)];
 	}
+
 	if (!create)
 		return pt;
 	
@@ -454,6 +465,9 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		if (!pte)
 			break;
 		*pte = PTE_ADDR(pa) | perm | PTE_P;
+
+		
+
 		va += PGSIZE;
 		pa += PGSIZE;
 	}
@@ -465,8 +479,10 @@ boot_map_region_4m(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int p
 {
 	int pgnum = (size - 1 + PGSIZE4M) / PGSIZE4M;
 	int i;
+	cprintf("size is %x\n", size);
+	cprintf("pgnum is %d\n", pgnum);
 	for(i = 0; i < pgnum; i++) {
-		pgdir[PDX(va)] = (pa & 0xfffc0000) | perm | PTE_P | PTE_PS;
+		pgdir[PDX(va)] = PTE4M(pa) | perm | PTE_P | PTE_PS;
 		va += PGSIZE4M;
 		pa += PGSIZE4M;
 	}
@@ -538,14 +554,18 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	// cprintf("lookup\n");
+	cprintf("lookup\n");
+
 	pte_t *pte = pgdir_walk(pgdir, va, 0);
 	if (pte_store)
 		*pte_store = pte;
 	// cprintf("pte is 0x%x\n", pte);
 	// cprintf("*pte is 0x%x\n", *pte);
-	if (!pte || ! *pte)
+	if (!pte || !(*pte & PTE_P))
 		return NULL;
+
+	// if (*pte & PTE_PS) 
+	// 	return pa2pape(PA4M(*pte));
 
 	physaddr_t pa = PTE_ADDR(*pte) | PGOFF(va);
 	return pa2page(pa);
@@ -801,7 +821,7 @@ check_kern_pgdir_4m(void){
 	
 	npg = (0xffffffff - KERNBASE) / PGSIZE4M;
 	for (i = 0; i < npg; i++) {
-		assert((kern_pgdir[PDX(KERNBASE + i * PGSIZE4M)] & 0xffc00000) == i * PGSIZE4M);
+		assert(PTE4M(kern_pgdir[PDX(KERNBASE + i * PGSIZE4M)]) == i * PGSIZE4M);
 		assert(kern_pgdir[PDX(KERNBASE + i * PGSIZE4M)] & PTE_PS);
 	}
 
@@ -1037,6 +1057,8 @@ check_page_installed_pgdir(void)
 	memset(page2kva(pp1), 1, PGSIZE);
 	memset(page2kva(pp2), 2, PGSIZE);
 	page_insert(kern_pgdir, pp1, (void*) PGSIZE, PTE_W);
+		cprintf("TAG\n");
+
 	assert(pp1->pp_ref == 1);
 	assert(*(uint32_t *)PGSIZE == 0x01010101U);
 	page_insert(kern_pgdir, pp2, (void*) PGSIZE, PTE_W);

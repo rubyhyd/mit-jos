@@ -10,9 +10,11 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/pmap.h>
+
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
-
+#define ONEorZERO(a) ((a) == 0? 0 : 1)
 
 struct Command {
 	const char *name;
@@ -25,6 +27,10 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Display stack backtrace information", mon_backtrace },
+	{ "sm", "show mapping virtual address to physical address", mon_sm },
+	{	"q", "quit", mon_quit }, 
+	{ "setpg", "set page mark bits", mon_setpg},
+	{ "dump", "dump the comtent of memory given va or pa", mon_dump},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -87,7 +93,109 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+int 
+mon_sm(int argc, char **argv, struct Trapframe *tf) {
+	extern pde_t* kern_pgdir;
+	physaddr_t pa;
+	pte_t *pte;
 
+	if (argc != 3) {
+		cprintf("The number of arguments is %d, must be 2\n", argc - 1);
+		return 0;
+	}
+
+	uint32_t va1, va2, npg;
+	va1 = strtol(argv[1], 0, 16);
+	va2 = strtol(argv[2], 0, 16);
+
+	if (va2 < va1) {
+		cprintf("va2 cannot be less than va1\n");
+		return 0;
+	}
+
+	for(; va1 <= va2; va1 += 0x1000) {
+		pte = pgdir_walk(kern_pgdir, (const void *)va1, 0);
+
+		if (!pte) {
+			cprintf("va is 0x%x, pa is NOT found\n", va1);
+			continue;
+		}
+
+		if (*pte & PTE_PS)
+			pa = PTE4M(*pte) + (va1 & 0x3fffff);
+		else
+			pa = PTE_ADDR(*pte) + PGOFF(va1);	
+
+		cprintf("va is 0x%08x, pa is 0x%08x.\n  PS %d U/S %d R/W %d P %d\n"
+			,va1, pa, ONEorZERO(*pte & PTE_PS), ONEorZERO(*pte & PTE_U)
+			, ONEorZERO(*pte & PTE_W), ONEorZERO(*pte & PTE_P));
+	}
+	return 0;
+}
+
+int mon_setpg(int argc, char** argv, struct Trapframe* tf) {
+	if (argc % 2 != 0) {
+		cprintf("The number of arguments is wrong.\n\
+The format is like followings:\n\
+  setpg va bit1 value1 bit2 value2 ...\n\
+  bit is in {\"P\", \"U\", \"W\"}, value is 0 or 1\n", argc);
+		return 0;
+	}
+
+	uint32_t va = strtol(argv[1], 0, 16);
+	pte_t *pte = pgdir_walk(kern_pgdir, (const void *)va, 0);
+
+	if (!pte) {
+			cprintf("va is 0x%x, pa is NOT found\n", va);
+			return 0;
+		}
+
+	int i = 2;
+	for(;i + 1 < argc; i += 2) {
+
+		switch((uint8_t)argv[i][0]) {
+			case 'p':
+			case 'P': {
+				cprintf("P was %d, ", ONEorZERO(*pte & PTE_P));
+				*pte &= ~PTE_P;
+				if (strtol(argv[i + 1], 0, 10))
+					*pte |= PTE_P;
+				cprintf("and is set to %d\n", ONEorZERO(*pte & PTE_P));
+				break;
+			};
+			case 'u':
+			case 'U': {
+				cprintf("U was %d, ", ONEorZERO(*pte & PTE_U));
+				*pte &= ~PTE_U;
+				if (strtol(argv[i + 1], 0, 10))
+					*pte |= PTE_U ;
+				cprintf("and is set to %d\n", ONEorZERO(*pte & PTE_U));
+				break;
+			};
+			case 'w':
+			case 'W': {
+				cprintf("W was %d, ", ONEorZERO(*pte & PTE_W));
+				*pte &= ~PTE_W;
+				if (strtol(argv[i + 1], 0, 10))
+					*pte |= PTE_W;
+				cprintf("and is set to %d\n", ONEorZERO(*pte & PTE_W));
+				break;
+			};
+			default: break;
+		}
+	}
+	return 0;
+}
+
+int
+mon_dump(int argc, char** argv, struct Trapframe* tf){
+	return 0;
+}
+
+int 
+mon_quit(int argc, char** argv, struct Trapframe* tf) {
+	return -1;
+}
 
 /***** Kernel monitor command interpreter *****/
 

@@ -1,0 +1,66 @@
+<h1 id="lab-2-report">Lab 2 Report</h1>
+<h2 id="paging-in-jos">Paging In Jos</h2>
+<p>Paging in jos is set up twice:</p>
+<h3 id="in-the-entry.s">In the entry.S</h3>
+<table class="sourceCode gnuassembler numberLines"><tr class="sourceCode"><td class="lineNumbers"><pre>1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="sourceCode"><pre><code class="sourceCode gnuassembler">  <span class="co"># Load the physical address of entry_pgdir into cr3.  entry_pgdir</span>
+  <span class="co"># is defined in entrypgdir.c.</span>
+  movl  $(RELOC(entry_pgdir)), %eax
+  movl  %eax, %cr3
+
+  <span class="co"># Turn on paging.</span>
+  movl  %cr0, %eax
+  orl $(CR0_PE|CR0_PG|CR0_WP), %eax
+  movl  %eax, %cr0</code></pre></td></tr></table>
+<p>This is the beginning of kernel. It set up an original paging for kernel to run as well as to set up another paging correctly. This paging maps virtual address spaces [0, 4M], [KERNBASE, KERNBASE + 4M] to the same physical address space [0, 4M].</p>
+<p>The latter mapping, from [KERNBASE, KERNBASE + 4M] to [0, 4M]is easy to understand, since the linking address is set in kernel.ld <code>. = 0xF0100000;</code>. The kernel program believes that it is running from KERNBASE and the locations of all its symbols are computed according to KERNBASE. We can see it from its <code>objdump -h</code> file as followings:</p>
+<table class="sourceCode numberLines"><tr class="sourceCode"><td class="lineNumbers"><pre>1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="sourceCode"><pre><code class="sourceCode">  Sections:
+  Idx Name          Size      VMA       LMA       File off  Algn
+    0 .text         00003e37  f0100000  00100000  00001000  2**4
+                    CONTENTS, ALLOC, LOAD, READONLY, CODE
+    1 .rodata       000015d0  f0103e40  00103e40  00004e40  2**5
+                    CONTENTS, ALLOC, LOAD, READONLY, DATA
+    2 .stab         00006061  f0105410  00105410  00006410  2**2
+                    CONTENTS, ALLOC, LOAD, READONLY, DATA
+    3 .stabstr      00001e31  f010b471  0010b471  0000c471  2**0
+                    CONTENTS, ALLOC, LOAD, READONLY, DATA
+    4 .data         0000a300  f010e000  0010e000  0000f000  2**12
+                    CONTENTS, ALLOC, LOAD, DATA
+    5 .bss          00000670  f0118300  00118300  00019300  2**5
+                    ALLOC</code></pre></td></tr></table>
+<p>It shows that the VMA is starting from <code>f0100000</code> and ending near <code>f0118300</code>. But it is placed physically in memory from <code>00100000</code> to about <code>00118300</code>. After the first paging, to let kernel run correctly, this mapping must be set. For example, in the code there exists an instruction <code>call f0100040</code>, if the paging is started and the mapping is correct, then it will be translated to <code>call 00100040</code> and it can find the correct place of the funtion in the physical memory.</p>
+<p>The other mapping, from [0, 4M] to [0, 4M], is also needed, or the kernel will corrupt. After the paging is started, the eip is still in between [0, 4M], correctly poingting to the physical address where next instuction is. However, since the paging is started, the address in the eip will be treated as a virtual address and try to translate it into a physical one. It is an absolute disaster and that's why we need this mapping.</p>
+<h3 id="in-the-pmap.c">In the pmap.c</h3>
+<p>This mapping is set up by us. We build several functions to make mapping dynamic. It's time to review somthing about paging.</p>
+<p>To realize a mapping is to fill an entry in a page table or directory. We have the kern_pgdir, let's consider 4K paging and 4M paging respectively. To realize 4K paging, we need to look into both page directory and page table. If we fail to find the corresponding entry in the page directory, we must allocate an physical page as a page table to hold mapping information. If the correspondng page table exists, fill the corresponding entry. To realize 4M paing, however, is much simpler. All we need to do is filling entry in the page directoy.</p>
+<p>In this mapping, [KERNBASE, 0xffffffff] is mapped to [0, 0xffffffff - KERNBASE], kernelstack [KSTACKTOP-KSTKSIZE, KSTACKTOP] is mapped to [bootstack, bootstack + KSTKSIZE], pages [UPAGES, UPAGES + sizeof(pages)] is mapped to [pages, pages + sizeof(pages)]. All these symbols above have accurate physical addresses:</p>
+<ul>
+<li>KERNBASE 0xf0000000</li>
+<li>bootstack 0x0010e000</li>
+<li>KSTACKTOP 0xf0000000</li>
+<li>KSTKSIZE 0x00400000</li>
+<li>UPAGES 0xef000000</li>
+</ul>
+<h2 id="on-paging-construction">On Paging Construction</h2>
