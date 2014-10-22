@@ -151,6 +151,8 @@ gdb:
 	gdb -x .gdbinit
 
 pre-qemu: .gdbinit
+	$(OBJDUMP) -x obj/kern/kernel > kernel.elf
+
 
 qemu: $(IMAGES) pre-qemu
 	$(QEMU) $(QEMUOPTS)

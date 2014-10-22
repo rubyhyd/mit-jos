@@ -163,8 +163,8 @@ static void
 cga_putc(int c)
 {
 	// if no attribute given, then use black on white
-	if (!(c & ~0xFF))
-		c |= 0x0700;
+	if (!(c & ~0xff))
+		c |= 0x1200;
 
 	switch (c & 0xff) {
 	case '\b':
@@ -192,6 +192,7 @@ cga_putc(int c)
 	}
 
 	// What is the purpose of this?
+	// 考虑到屏幕盛不下，溢出情况，会移动显示内存
 	if (crt_pos >= CRT_SIZE) {
 		int i;
 
