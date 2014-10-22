@@ -189,6 +189,73 @@ The format is like followings:\n\
 
 int
 mon_dump(int argc, char** argv, struct Trapframe* tf){
+	if (argc != 4)  {
+		cprintf("The number of arguments is wrong, must be 3.\n");
+		return 0;
+	}
+
+	char type = argv[1][0];
+	if (type != 'p' && type != 'v') {
+		cprintf("The first argument must be 'p' or 'v'\n");
+		return 0;
+	} 
+
+	uint32_t begin = strtol(argv[2], 0, 16);
+	uint32_t num = strtol(argv[3], 0, 10);
+	int i = begin;
+	pte_t *pte;
+
+	if (type == 'v') {
+		cprintf("Virtual Memory Content:\n");
+
+		
+		pte = pgdir_walk(kern_pgdir, (const void *)i, 0);
+
+		for (; i < num * 4 + begin; i += 4 ) {
+			if ((i - 1) / PGSIZE != i / PGSIZE)
+				pte = pgdir_walk(kern_pgdir, (const void *)i, 0);
+
+			if (!pte  || !(*pte & PTE_P)) {
+				cprintf("  0x%08x  %s\n", i, "null");
+				continue;
+			}
+
+			uint32_t content = *(uint32_t *)i;
+			cprintf("  0x%08x  %02x %02x %02x %02x\n", i, 
+				content << 24 >> 24, content << 16 >> 24,
+				content << 8 >> 24, content >> 24);
+		}
+	}
+
+	if (type == 'p') {
+		int j = 0;
+		for (; j < 1024; j++)
+			if (!(kern_pgdir[j] & PTE_P))
+				break;
+
+		//("j is %d\n", j);
+		if (j == 1024) {
+			cprintf("The page directory is full!\n");
+			return 0;
+		}
+
+		kern_pgdir[j] = PTE4M(i) | PTE_PS | PTE_P;
+
+		cprintf("Physical Memory Content:\n");
+
+		for (; i < num * 4 + begin; i += 4) {
+			if ((i - 1) / PGSIZE4M != i / PGSIZE4M)
+				kern_pgdir[j] = PTE4M(i) | PTE_PS | PTE_P;
+
+			uint32_t content = *(uint32_t *)((i << 10 >> 10) + (j << 22));
+			cprintf("  0x%08x  %02x %02x %02x %02x\n", i,
+				content << 24 >> 24, content << 16 >> 24,
+				content << 8 >> 24, content >> 24);
+		}
+
+		kern_pgdir[j] = 0;
+	}
+
 	return 0;
 }
 

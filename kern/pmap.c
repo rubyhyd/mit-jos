@@ -176,7 +176,7 @@ mem_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
-	int i = 0;
+
 	
 
 
@@ -254,17 +254,17 @@ mem_init(void)
 	// Some more checks, only possible after kern_pgdir is installed.
 	//check_page_installed_pgdir();
 
-	//print kern_pgdir
-	// int i = 0, j = 0;
-	// for (;i < 1024; i++)
-	// 	if (kern_pgdir[i] & PTE_P) {
-	// 		pte_t* pte= (pte_t *)page2kva(pa2page(PTE_ADDR(kern_pgdir[i])));
+	// //print kern_pgdir
+	// int i = 1023, j = 0;
+	// for (;i >= 0; i--)
+	// 	if (true || kern_pgdir[i] & PTE_P) {
+	// 		//pte_t* pte= (pte_t *)page2kva(pa2page(PTE_ADDR(kern_pgdir[i])));
 
-	// 		cprintf("%d\t0x%x\t0x%x\t0x%x\n", 
-	// 			i, i * PGSIZE * 0x400, pte);
-	// 		for (j = 0; j < 1024; j++)
-	// 			if (pte[j] & PTE_P)
-	// 				cprintf("\t\t\t%d\t0x%x\t%x\n", j, j * PGSIZE, pte[j]);
+	// 		cprintf("%d | 0x%08x | 0x%08x \n", 
+	// 			i, i * PGSIZE * 0x400, kern_pgdir[i]);
+	// 		// for (j = 0; j < 1024; j++)
+	// 		// 	if (pte[j] & PTE_P)
+	// 		// 		cprintf("\t\t\t%d\t0x%x\t%x\n", j, j * PGSIZE, pte[j]);
 	// 	}
 }
 
