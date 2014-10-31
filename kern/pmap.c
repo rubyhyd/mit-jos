@@ -133,6 +133,7 @@ mem_init(void)
 	uint32_t cr0;
 	uint32_t cr4;
 	size_t n;
+	extern struct Env *envs;
 
 	// Find out how much memory the machine has (npages & npages_basemem).
 	i386_detect_memory();
@@ -169,7 +170,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
-
+ 	envs = (struct Env *) boot_alloc(NENV * sizeof(struct Env));
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
 	// up the list of free physical pages. Once we've done so, all further
@@ -181,9 +182,6 @@ mem_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
-
-	
-
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -205,7 +203,8 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
-
+	boot_map_region(kern_pgdir, UENVS,
+		NENV * sizeof(struct Env), PADDR(envs), PTE_U | PTE_P);
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -250,7 +249,7 @@ mem_init(void)
 	lcr4(cr4);
 
 	lcr3(PADDR(kern_pgdir));
-	//cprintf("bug1\n");
+	cprintf("bug1\n");
 
 	check_page_free_list(0);
 	//cprintf("bug1\n");
@@ -530,7 +529,7 @@ boot_map_region_4m(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int p
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	cprintf("insert\n");
+	//cprintf("insert\n");
 	page_remove(pgdir, va);
 	
 	pte_t *pte = pgdir_walk(pgdir, va, 1);
@@ -567,7 +566,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	cprintf("lookup\n");
+	//cprintf("lookup\n");
 
 	pte_t *pte = pgdir_walk(pgdir, va, 0);
 	if (pte_store)
@@ -602,7 +601,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 void
 page_remove(pde_t *pgdir, void *va)
 {
-	cprintf("remove\n");
+	//cprintf("remove\n");
 	pte_t *ptep;
 	struct PageInfo * pp = page_lookup(pgdir, va, &ptep);
 	if (!pp) 
@@ -610,7 +609,7 @@ page_remove(pde_t *pgdir, void *va)
 
 	page_decref(pp);
 	pte_t *pte = ptep;
-	cprintf("remove: pte is 0x%x\n", pte);
+	//cprintf("remove: pte is 0x%x\n", pte);
 	*pte = 0;
 	tlb_invalidate(pgdir, va);
 }
@@ -843,7 +842,7 @@ check_kern_pgdir(void)
 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
 
 
-	// check envs array (new test for lab 3)
+	//check envs array (new test for lab 3)
 	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);

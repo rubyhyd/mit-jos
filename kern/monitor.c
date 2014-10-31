@@ -13,6 +13,7 @@
 
 #include <kern/trap.h>
 #include <kern/pmap.h>
+#include <kern/env.h>
 
 
 
@@ -211,8 +212,9 @@ mon_dump(int argc, char** argv, struct Trapframe* tf){
 	if (type == 'v') {
 		cprintf("Virtual Memory Content:\n");
 
+		extern struct Env *curenv;
 		
-		pte = pgdir_walk(kern_pgdir, (const void *)i, 0);
+		pte = pgdir_walk(curenv->env_pgdir, (const void *)i, 0);
 
 		for (; i < num * 4 + begin; i += 4 ) {
 			if ((i - 1) / PGSIZE != i / PGSIZE)
@@ -264,7 +266,14 @@ mon_dump(int argc, char** argv, struct Trapframe* tf){
 
 int 
 mon_quit(int argc, char** argv, struct Trapframe* tf) {
-	return -1;
+	// extern char gdt[];
+
+	// uint32_t *i = (uint32_t *)gdt;
+	// uint32_t j = 0;
+	// for (;j < 6; j++, i++)
+	// 	cprintf("0x%08x ", *i);
+	// cprintf("\n");
+	return 0;
 }
 
 /***** Kernel monitor command interpreter *****/
