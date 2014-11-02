@@ -64,7 +64,7 @@ TRAPHANDLER_NOEC(H_T_FPERR  , 16)
 TRAPHANDLER(H_T_ALIGN  , 17)		
 TRAPHANDLER_NOEC(H_T_MCHK   , 18)		
 TRAPHANDLER_NOEC(H_T_SIMDERR, 19)		
-
+TRAPHANDLER_NOEC(H_T_SYSCALL, 48)
 /*
  * Lab 3: Your code here for _alltraps
  */
@@ -74,13 +74,12 @@ TRAPHANDLER_NOEC(H_T_SIMDERR, 19)
  	pushl %es
  	pushal
  	
- 	movl $GD_KD, %ax
- 	movl %ax, %ds
- 	movl %ax, %es
+ 	movl $GD_KD, %eax
+ 	movl %eax, %ds
+ 	movl %eax, %es
 
  	pushl %esp 
   call trap
-
 
 
 

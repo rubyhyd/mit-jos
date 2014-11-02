@@ -328,7 +328,7 @@ page_init(void)
 	extern char end[];
 	struct PageInfo* pbegin = pa2page((physaddr_t)IOPHYSMEM);
 	struct PageInfo* pend = pa2page((physaddr_t)
-		(end + PGSIZE + npages * sizeof(struct PageInfo) - KERNBASE));
+		(end + PGSIZE + npages * sizeof(struct PageInfo) + NENV * sizeof(struct Env) - KERNBASE));
 	struct PageInfo* ppi = pbegin;
 	for (;ppi != pend; ppi += 1) {
 		// ppi->pp_ref = 1;
@@ -336,6 +336,7 @@ page_init(void)
 	}
 	// pend->pp_ref = 1;
 	(pend + 1)->pp_link = pbegin - 1;
+	cprintf("last page is %08x\n", page2kva(pend));
 }
 
 //
@@ -650,6 +651,26 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	if ((uint32_t)va >= ULIM || (uint32_t)va + len >= ULIM) {
+		user_mem_check_addr = (uint32_t)va;
+		return -E_FAULT;
+	}
+
+	bool readable = true;
+	void *p = (void *)va;
+	for (;p < (void *)va + len; p ++) {
+		//cprintf("virtual address is %08x\n", p);
+
+		pte_t * pte = pgdir_walk(env->env_pgdir, p, 0);
+		if (!pte || !(*pte & PTE_P) || !(*pte & perm)) {
+			readable = false;
+			user_mem_check_addr = (uint32_t)p;
+			break;
+		}
+	}
+
+	if (!readable)
+		return -E_FAULT;
 
 	return 0;
 }

@@ -275,7 +275,6 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 static void
 region_alloc(struct Env *e, void *va, size_t len)
 {
-	cprintf("regin_alloc! va is 0x%08x, len is %d\n", va, len);
 	// LAB 3: Your code here.
 	// (But only if you need it for load_icode.)
 	//
@@ -284,14 +283,26 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
 	void *i;
-	for (i = ROUNDDOWN(va, PGSIZE);i < ROUNDUP(len + va, PGSIZE); i += PGSIZE) {
-		struct PageInfo *pp = page_alloc(ALLOC_ZERO);
+	for (i = ROUNDDOWN(va, PGSIZE); i < ROUNDUP(len + va, PGSIZE); i += PGSIZE) {
+		
+		// if ( (uint32_t)i == 0x00a3d000 || (uint32_t)i == 0x00a3c000) {
+		// 	cprintf("i is %08x\n", i);
+		// 	cprintf("e is %08x\n", e);
+		// 	cprintf("e->env_pgdir is %08x\n", e->env_pgdir);
+		// 	//cprintf("pp physical is %08x\n", page2kva(pp));
+		// 	cprintf("e->env_pgdir[i] is %08x\n", e->env_pgdir[PDX(i)]);
+		// 	//asm volatile("int $3");	
+		// }
 
+		struct PageInfo *pp = page_alloc(ALLOC_ZERO);
+		// cprintf("pp is %08x\n", page2kva(pp));
+		
 		if (!pp)
 			panic("No free pages for envs!");
 		page_insert(e->env_pgdir, pp, i, PTE_U | PTE_W);
+		// cprintf("region_alloc insert %08x\n", i);
 	}
-	cprintf("regin_alloc! end!\n");
+	//cprintf("regin_alloc! end!\n");
 }
 
 //
@@ -361,7 +372,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	eph = ph + elf->e_phnum;
 	for (; ph < eph; ph++)
 		if (ph->p_type == ELF_PROG_LOAD) {
-			region_alloc(e, (void *)ph->p_va, ph->p_filesz);
+			region_alloc(e, (void *)ph->p_va, ph->p_memsz);
 			int i = 0;
 			char * va = (char *)ph->p_va;			
 
@@ -376,8 +387,10 @@ load_icode(struct Env *e, uint8_t *binary)
 				//cprintf("binary[ph->p_offset + i] is %d\n", binary[ph->p_offset + i]);
 				va[i] = binary[ph->p_offset + i];
 			}
-			cprintf("bug2\n");
+			//cprintf("va is %08x, memsz is %08x, filesz is %08x\n", 
+			//	ph->p_va, ph->p_memsz, ph->p_filesz);
 		}
+
 	e->env_tf.tf_eip = elf->e_entry;
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
@@ -397,12 +410,12 @@ env_create(uint8_t *binary, enum EnvType type)
 {
 	cprintf("env_create!\n");
 	// LAB 3: Your code here.
-	struct Env *env;
-	int r = env_alloc(&env, 0);
+	struct Env *e;
+	int r = env_alloc(&e, 0);
 
 	if (r == 0) {
-		env->env_type = type;
-		load_icode(env, binary);
+		e->env_type = type;
+		load_icode(e, binary);
 	}
 	else
 		cprintf("create env fails!");

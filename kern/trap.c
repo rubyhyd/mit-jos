@@ -84,12 +84,12 @@ trap_init(void)
 	NAME(H_T_ALIGN  );
 	NAME(H_T_MCHK   );
 	NAME(H_T_SIMDERR);
-	//NAME(H_T_SYSCALL);
+	NAME(H_T_SYSCALL);
 
 	SETGATE(idt[0] , 0, GD_KT, H_T_DIVIDE , 0);
 	SETGATE(idt[1] , 0, GD_KT, H_T_DEBUG  , 0);
 	SETGATE(idt[2] , 0, GD_KT, H_T_NMI    , 0);
-	SETGATE(idt[3] , 0, GD_KT, H_T_BRKPT  , 0);
+	SETGATE(idt[3] , 0, GD_KT, H_T_BRKPT  , 3);
 	SETGATE(idt[4] , 0, GD_KT, H_T_OFLOW  , 0);
 	SETGATE(idt[5] , 0, GD_KT, H_T_BOUND  , 0);
 	SETGATE(idt[6] , 0, GD_KT, H_T_ILLOP  , 0);
@@ -104,7 +104,7 @@ trap_init(void)
 	SETGATE(idt[17], 0, GD_KT, H_T_ALIGN  , 0);
 	SETGATE(idt[18], 0, GD_KT, H_T_MCHK   , 0);
 	SETGATE(idt[19], 0, GD_KT, H_T_SIMDERR, 0);
-	//SETGATE(idt[48], 1, GD_KT, H_T_SYSCALL, 0);
+	SETGATE(idt[48], 1, GD_KT, H_T_SYSCALL, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -183,12 +183,26 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-	switch(tf->tf_trapno) {
-		case 0: {
-			cprintf("1/0 is not allowed!\n");
-			break;
-		}
+	
+
+	if(tf->tf_trapno == T_DIVIDE) {
+		cprintf("1/0 is not allowed!\n");
 	}
+	if(tf->tf_trapno == T_BRKPT) {
+		cprintf("Breakpoint!\n");
+		monitor(tf);
+	}
+	if(tf->tf_trapno == T_PGFLT) {
+		cprintf("Page fault!\n");
+		page_fault_handler(tf);
+	}
+	if(tf->tf_trapno == T_SYSCALL) {
+		cprintf("System call!\n");
+		syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx,
+			tf->tf_regs.reg_ebx, tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+		return;
+	}
+	
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -247,8 +261,9 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
-
-	// LAB 3: Your code here.
+	if (tf->tf_cs == GD_KT) 
+		panic("kernel page fault!\n");
+	
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
