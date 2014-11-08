@@ -23,10 +23,22 @@ $(OBJDIR)/boot/main.o: boot/main.c
 	@echo + cc -Os $<
 	$(V)$(CC) -nostdinc $(KERN_CFLAGS) -Os -c -o $(OBJDIR)/boot/main.o boot/main.c
 
+#如下操作分析
+#ld: 链接并将代码段放置在相对开头偏移为0x7c00的位置, 得到boot.out
+#objcopy: 将boot.out的代码段写入到boot的开头
+#但是真正加载时,会把第一个扇区的文件加载到初始位置为0x7c00
+#所以,ld参数中的-Ttext没有意义.但是不是这样的....
 $(OBJDIR)/boot/boot: $(BOOT_OBJS)
 	@echo + ld boot/boot
 	$(V)$(LD) $(LDFLAGS) -N -e start -Ttext 0x7C00 -o $@.out $^
 	$(V)$(OBJDUMP) -S $@.out >$@.asm
 	$(V)$(OBJCOPY) -S -O binary -j .text $@.out $@
 	$(V)perl boot/sign.pl $(OBJDIR)/boot/boot
+
+
+
+
+
+
+
 

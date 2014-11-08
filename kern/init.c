@@ -147,6 +147,7 @@ _panic(const char *file, int line, const char *fmt,...)
 	cprintf("kernel panic on CPU %d at %s:%d: ", cpunum(), file, line);
 	vcprintf(fmt, ap);
 	cprintf("\n");
+	mon_backtrace(0, 0, 0);
 	va_end(ap);
 
 dead:

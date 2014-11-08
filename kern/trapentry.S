@@ -15,7 +15,7 @@
  * It pushes a trap number onto the stack, then jumps to _alltraps.
  * Use TRAPHANDLER for traps where the CPU automatically pushes an error code.
  *
- * You shouldn't call a TRAPHANDLER function from C, but you may
+ * You shouldnt call a TRAPHANDLER function from C, but you may
  * need to _declare_ one in C (for instance, to get a function pointer
  * during IDT setup).  You can declare the function with
  *   void NAME();
@@ -29,7 +29,7 @@
 	pushl $(num);							\
 	jmp _alltraps
 
-/* Use TRAPHANDLER_NOEC for traps where the CPU doesn't push an error code.
+/* Use TRAPHANDLER_NOEC for traps where the CPU doesnt push an error code.
  * It pushes a 0 in place of the error code, so the trap frame has the same
  * format in either case.
  */
@@ -47,10 +47,44 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
-
-
-
+TRAPHANDLER_NOEC(H_T_DIVIDE ,  0)		
+TRAPHANDLER_NOEC(H_T_DEBUG  ,  1)		
+TRAPHANDLER_NOEC(H_T_NMI    ,  2)		
+TRAPHANDLER_NOEC(H_T_BRKPT  ,  3)		
+TRAPHANDLER_NOEC(H_T_OFLOW  ,  4)		
+TRAPHANDLER_NOEC(H_T_BOUND  ,  5)		
+TRAPHANDLER_NOEC(H_T_ILLOP  ,  6)		
+TRAPHANDLER_NOEC(H_T_DEVICE ,  7)		
+TRAPHANDLER(H_T_DBLFLT ,  8)		
+TRAPHANDLER(H_T_TSS    , 10)		
+TRAPHANDLER(H_T_SEGNP  , 11)		
+TRAPHANDLER(H_T_STACK  , 12)		
+TRAPHANDLER(H_T_GPFLT  , 13)		
+TRAPHANDLER(H_T_PGFLT  , 14)		
+TRAPHANDLER_NOEC(H_T_FPERR  , 16)		
+TRAPHANDLER(H_T_ALIGN  , 17)		
+TRAPHANDLER_NOEC(H_T_MCHK   , 18)		
+TRAPHANDLER_NOEC(H_T_SIMDERR, 19)		
+TRAPHANDLER_NOEC(H_T_SYSCALL, 48)
 /*
  * Lab 3: Your code here for _alltraps
  */
+
+ _alltraps:
+ 	pushl %ds
+ 	pushl %es
+ 	pushal
+ 	
+ 	movl $GD_KD, %eax
+ 	movl %eax, %ds
+ 	movl %eax, %es
+
+ 	pushl %esp 
+  call trap
+
+
+
+
+
+
 

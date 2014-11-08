@@ -14,6 +14,8 @@
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
 
+#define NAME(x) extern void x()
+
 static struct Taskstate ts;
 
 /* For debugging, so print_trapframe can distinguish between printing
@@ -65,13 +67,51 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
-
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
 
-	// LAB 3: Your code here.
+	NAME(H_T_DIVIDE );
+	NAME(H_T_DIVIDE );
+	NAME(H_T_DEBUG  );
+	NAME(H_T_NMI    );
+	NAME(H_T_BRKPT  );
+	NAME(H_T_OFLOW  );
+	NAME(H_T_BOUND  );
+	NAME(H_T_ILLOP  );
+	NAME(H_T_DEVICE );
+	NAME(H_T_DBLFLT );
+	NAME(H_T_TSS    );
+	NAME(H_T_SEGNP  );
+	NAME(H_T_STACK  );
+	NAME(H_T_GPFLT  );
+	NAME(H_T_PGFLT  ); 
+	NAME(H_T_FPERR  );
+	NAME(H_T_ALIGN  );
+	NAME(H_T_MCHK   );
+	NAME(H_T_SIMDERR);
+	NAME(H_T_SYSCALL);
+
+	SETGATE(idt[0] , 0, GD_KT, H_T_DIVIDE , 0);
+	SETGATE(idt[1] , 0, GD_KT, H_T_DEBUG  , 0);
+	SETGATE(idt[2] , 0, GD_KT, H_T_NMI    , 0);
+	SETGATE(idt[3] , 0, GD_KT, H_T_BRKPT  , 3);
+	SETGATE(idt[4] , 0, GD_KT, H_T_OFLOW  , 0);
+	SETGATE(idt[5] , 0, GD_KT, H_T_BOUND  , 0);
+	SETGATE(idt[6] , 0, GD_KT, H_T_ILLOP  , 0);
+	SETGATE(idt[7] , 0, GD_KT, H_T_DEVICE , 0);
+	SETGATE(idt[8] , 0, GD_KT, H_T_DBLFLT , 0);
+	SETGATE(idt[10], 0, GD_KT, H_T_TSS    , 0);
+	SETGATE(idt[11], 0, GD_KT, H_T_SEGNP  , 0);
+	SETGATE(idt[12], 0, GD_KT, H_T_STACK  , 0);
+	SETGATE(idt[13], 0, GD_KT, H_T_GPFLT  , 0);
+	SETGATE(idt[14], 0, GD_KT, H_T_PGFLT  , 0);
+	SETGATE(idt[16], 0, GD_KT, H_T_FPERR  , 0);
+	SETGATE(idt[17], 0, GD_KT, H_T_ALIGN  , 0);
+	SETGATE(idt[18], 0, GD_KT, H_T_MCHK   , 0);
+	SETGATE(idt[19], 0, GD_KT, H_T_SIMDERR, 0);
+	SETGATE(idt[48], 1, GD_KT, H_T_SYSCALL, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -173,6 +213,11 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	if(tf->tf_trapno == T_DEBUG) {
+		cprintf(">>>debug\n");
+		monitor(tf);
+		return;
+	}
 
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
@@ -187,6 +232,26 @@ trap_dispatch(struct Trapframe *tf)
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
 
+
+	if(tf->tf_trapno == T_DIVIDE) {
+		cprintf("1/0 is not allowed!\n");
+	}
+	if(tf->tf_trapno == T_BRKPT) {
+		cprintf("Breakpoint!\n");
+		monitor(tf);
+		return;
+	}
+	if(tf->tf_trapno == T_PGFLT) {
+		cprintf("Page fault!\n");
+		page_fault_handler(tf);
+	}
+	if(tf->tf_trapno == T_SYSCALL) {
+		cprintf("System call!\n");
+		syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx,
+			tf->tf_regs.reg_ebx, tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+		return;
+	}
+	
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -266,8 +331,9 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
-
-	// LAB 3: Your code here.
+	if (tf->tf_cs == GD_KT) 
+		panic("kernel page fault!\n");
+	
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.

@@ -38,6 +38,15 @@
 // offset in page
 #define PGOFF(la)	(((uintptr_t) (la)) & 0xFFF)
 
+// address in 4M page table entry
+#define PTE4M(va) (((uintptr_t) (va)) & 0xffc00000)
+
+// offset in 4m page
+#define PGOFF4M(va) (((uintptr_t) (va)) & 0x3fffff)
+
+// pa in 4m page
+//#define PG4MADDR(d, t) ((physaddr_t)d | (physaddr_t)t)
+
 // construct linear address from indexes and offset
 #define PGADDR(d, t, o)	((void*) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 
@@ -47,6 +56,7 @@
 
 #define PGSIZE		4096		// bytes mapped by a page
 #define PGSHIFT		12		// log2(PGSIZE)
+#define PGSIZE4M  (4096 * 1024)
 
 #define PTSIZE		(PGSIZE*NPTENTRIES) // bytes mapped by a page directory entry
 #define PTSHIFT		22		// log2(PTSIZE)
@@ -143,6 +153,33 @@
 	.word (((lim) >> 12) & 0xffff), ((base) & 0xffff);	\
 	.byte (((base) >> 16) & 0xff), (0x90 | (type)),		\
 		(0xC0 | (((lim) >> 28) & 0xf)), (((base) >> 24) & 0xff)
+
+//.word defines 2 numbers, total size is 4 bytes.
+//.byte defines 4 numbers, total size is 4 bytes.
+//
+// 0x90(1001 000) set Pr(1bit)=1. which must be 1 for all valid selectors.
+//                set Privl(2bits)=0. Privileg, 0 is the highest.
+// 0xc0(1100 000) set Gr(1bit)=1. Granularity, if equals 0, then limit is in 1 B blocks.
+//                                Otherwise, in 4 KiB blocks.
+//                set Sz(1bit)=1. 0, defines 16 bit protected mode. 1, 32 bit.
+//                                You can have both.                   
+// for code seg
+// 31...0
+// 00 00 ff ff
+// 63...32
+// 00 cf 9a ff
+//
+// its base is 0, limit is 4G, Readable and excutable.
+//
+//
+// for data seg
+// 31...0
+// 00 00 ff ff
+// 63...32
+// 00 cf 92 ff
+//
+// its base is 0, limit is 4G, Writeable and unexcutable.
+
 
 #else	// not __ASSEMBLER__
 
