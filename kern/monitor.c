@@ -35,6 +35,8 @@ static struct Command commands[] = {
 	{	"q", "quit", mon_quit }, 
 	{ "setpg", "set page mark bits", mon_setpg},
 	{ "dump", "dump the comtent of memory given va or pa", mon_dump},
+	{ "c", "continue the user env", mon_continue},
+	{ "si", "single step in user env", mon_singlestep},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -264,16 +266,34 @@ mon_dump(int argc, char** argv, struct Trapframe* tf){
 	return 0;
 }
 
+int
+mon_continue(int argc, char **argv, struct Trapframe *tf) {
+	if (!tf) {
+		cprintf("No trap!\n");
+		return 0;
+	}
+
+	tf->tf_eflags &= ~0x100;
+	cprintf("continue running!...\n");
+	return -1;
+}
+
+int
+mon_singlestep(int argc, char **argv, struct Trapframe *tf) {
+	if (!tf) {
+		cprintf("No trap!\n");
+		return 0;
+	}
+	tf->tf_eflags |= 0x100; // set debug mode
+	return -1;
+}
+
 int 
 mon_quit(int argc, char** argv, struct Trapframe* tf) {
-	// extern char gdt[];
+	if (tf)
+		tf->tf_eflags &= ~0x100;
 
-	// uint32_t *i = (uint32_t *)gdt;
-	// uint32_t j = 0;
-	// for (;j < 6; j++, i++)
-	// 	cprintf("0x%08x ", *i);
-	// cprintf("\n");
-	return 0;
+	return -1;
 }
 
 /***** Kernel monitor command interpreter *****/

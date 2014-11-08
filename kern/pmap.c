@@ -249,7 +249,6 @@ mem_init(void)
 	lcr4(cr4);
 
 	lcr3(PADDR(kern_pgdir));
-	cprintf("bug1\n");
 
 	check_page_free_list(0);
 	//cprintf("bug1\n");
@@ -656,12 +655,17 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 		return -E_FAULT;
 	}
 
+	pte_t * pte = pgdir_walk(env->env_pgdir, va, 0);
+	if (!pte || !(*pte & PTE_P) || !(*pte & perm)) {
+		user_mem_check_addr = (uint32_t)va;
+		return -E_FAULT;
+	}
+	
 	bool readable = true;
-	void *p = (void *)va;
-	for (;p < (void *)va + len; p ++) {
+	void *p = (void *)ROUNDUP((uint32_t)va, PGSIZE);
+	for (;p < (void *)va + len; p += PGSIZE) {
 		//cprintf("virtual address is %08x\n", p);
-
-		pte_t * pte = pgdir_walk(env->env_pgdir, p, 0);
+		pte = pgdir_walk(env->env_pgdir, p, 0);	
 		if (!pte || !(*pte & PTE_P) || !(*pte & perm)) {
 			readable = false;
 			user_mem_check_addr = (uint32_t)p;

@@ -183,7 +183,11 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-	
+	if(tf->tf_trapno == T_DEBUG) {
+		cprintf(">>>debug\n");
+		monitor(tf);
+		return;
+	}
 
 	if(tf->tf_trapno == T_DIVIDE) {
 		cprintf("1/0 is not allowed!\n");
@@ -191,6 +195,7 @@ trap_dispatch(struct Trapframe *tf)
 	if(tf->tf_trapno == T_BRKPT) {
 		cprintf("Breakpoint!\n");
 		monitor(tf);
+		return;
 	}
 	if(tf->tf_trapno == T_PGFLT) {
 		cprintf("Page fault!\n");
