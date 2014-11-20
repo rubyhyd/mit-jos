@@ -260,8 +260,6 @@ mem_init(void)
 	check_page_free_list(0);
 	//cprintf("bug1\n");
 
-	
-
 	// entry.S set the really important flags in cr0 (including enabling
 	// paging).  Here we configure the rest of the flags that we care about.
 	cr0 = rcr0();
@@ -308,7 +306,12 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	int i = 0;
+	for (; i < NCPU; i++) {
+		uint32_t kstacktop_i =  KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+		boot_map_region(kern_pgdir, kstacktop_i - KSTKSIZE, 
+			 KSTKSIZE, (physaddr_t) PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
+	}
 }
 
 // --------------------------------------------------------------
@@ -365,13 +368,19 @@ page_init(void)
 	struct PageInfo* pend = pa2page((physaddr_t)
 		(end + PGSIZE + npages * sizeof(struct PageInfo) + NENV * sizeof(struct Env) - KERNBASE));
 	struct PageInfo* ppi = pbegin;
-	for (;ppi != pend; ppi += 1) {
-		// ppi->pp_ref = 1;
+	for (;ppi != pend; ppi += 1) 
 		ppi->pp_ref = 0;
-	}
-	// pend->pp_ref = 1;
 	(pend + 1)->pp_link = pbegin - 1;
-	cprintf("last page is %08x\n", page2kva(pend));
+
+	//lab4 mcpu entry code
+	extern unsigned char mpentry_start[], mpentry_end[];
+	pbegin = pa2page(MPENTRY_PADDR);
+	pend = pa2page((physaddr_t)(MPENTRY_PADDR + mpentry_end - mpentry_start));
+	ppi = pbegin;
+
+	for (;ppi != pend; ppi += 1)
+		ppi->pp_ref = 0;
+	(pend + 1)->pp_link = pbegin - 1;
 }
 
 //
@@ -694,7 +703,12 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	boot_map_region(kern_pgdir, base, 
+		ROUNDUP(size, PGSIZE), pa, PTE_PWT | PTE_PCD | PTE_W);
+
+	base += ROUNDUP(size, PGSIZE);
+	return ((void *)(base - ROUNDUP(size, PGSIZE)));
+	//panic("mmio_map_region not implemented");
 }
 
 static uintptr_t user_mem_check_addr;
@@ -778,7 +792,7 @@ user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 static void
 check_page_free_list(bool only_low_memory)
 {
-	cprintf("start checking page_free_list...\n");
+	//cprintf("start checking page_free_list...\n");
 
 	struct PageInfo *pp;
 	unsigned pdx_limit = only_low_memory ? 1 : NPDENTRIES;
@@ -844,7 +858,7 @@ check_page_free_list(bool only_low_memory)
 static void
 check_page_alloc(void)
 {
-	cprintf("start checking page_alloc...\n");
+	//cprintf("start checking page_alloc...\n");
 
 	struct PageInfo *pp, *pp0, *pp1, *pp2;
 	int nfree;
@@ -928,7 +942,7 @@ check_page_alloc(void)
 static void
 check_kern_pgdir(void)
 {
-	cprintf("start checking kern pgdir...\n");
+	// cprintf("start checking kern pgdir...\n");
 	uint32_t i, n;
 	pde_t *pgdir;
 
@@ -954,9 +968,10 @@ check_kern_pgdir(void)
 	// (updated in lab 4 to check per-CPU kernel stacks)
 	for (n = 0; n < NCPU; n++) {
 		uint32_t base = KSTACKTOP - (KSTKSIZE + KSTKGAP) * (n + 1);
-		for (i = 0; i < KSTKSIZE; i += PGSIZE)
+		for (i = 0; i < KSTKSIZE; i += PGSIZE) 
 			assert(check_va2pa(pgdir, base + KSTKGAP + i)
 				== PADDR(percpu_kstacks[n]) + i);
+
 		for (i = 0; i < KSTKGAP; i += PGSIZE)
 			assert(check_va2pa(pgdir, base + i) == ~0);
 	}
@@ -985,7 +1000,7 @@ check_kern_pgdir(void)
 
 static void
 check_kern_pgdir_4m(void){
-	cprintf("start checking kern pgdir 4m...\n");
+	// cprintf("start checking kern pgdir 4m...\n");
 	uint32_t i, npg;
 	
 	npg = (0xffffffff - KERNBASE) / PGSIZE4M;
@@ -1045,7 +1060,7 @@ check_va2pa(pde_t *pgdir, uintptr_t va)
 static void
 check_page(void)
 {
-	cprintf("start checking page...\n");
+	//cprintf("start checking page...\n");
 	struct PageInfo *pp, *pp0, *pp1, *pp2;
 	struct PageInfo *fl;
 	pte_t *ptep, *ptep1;
@@ -1102,7 +1117,6 @@ check_page(void)
 
 	// should be no free memory
 	assert(!page_alloc(0));
-	cprintf("BUG...\n");
 	// should be able to map pp2 at PGSIZE because it's already there
 	assert(page_insert(kern_pgdir, pp2, (void*) PGSIZE, PTE_W) == 0);
 	assert(check_va2pa(kern_pgdir, PGSIZE) == page2pa(pp2));
@@ -1110,7 +1124,7 @@ check_page(void)
 
 	// pp2 should NOT be on the free list
 	// could happen in ref counts are handled sloppily in page_insert
-	cprintf("page_free_list is 0x%x\n", page_free_list);
+	//cprintf("page_free_list is 0x%x\n", page_free_list);
 
 	assert(!page_alloc(0));
 

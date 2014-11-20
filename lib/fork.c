@@ -24,17 +24,23 @@ pgfault(struct UTrapframe *utf)
 	//   Use the read-only page table mappings at uvpt
 	//   (see <inc/memlayout.h>).
 
-	// LAB 4: Your code here.
+	pte_t * vpte = 
+		(pte_t *)(PDX(UVPT) << 22 | PDX(addr) << 12 | PTX(addr) << 2);
+	if ((err & FEC_WR) == 0 || (*vpte & PTE_COW) == 0)
+		panic("pgfault: not cow!\n");
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
 	// page to the old page's address.
 	// Hint:
 	//   You should make three system calls.
+	envid_t envid = sys_getenvid();
+	if (sys_page_alloc(envid, (void *) PFTEMP, PTE_U | PTE_P | PTE_W) < 0)
+		panic("pgfault: page allocate error!\n");
 
-	// LAB 4: Your code here.
-
-	panic("pgfault not implemented");
+	memcpy((void *)PFTEMP, ROUNDDOWN(addr, PGSIZE), PGSIZE);
+	sys_page_map(envid, (void *)PFTEMP, envid, ROUNDDOWN(addr, PGSIZE), PTE_U | PTE_P | PTE_W);
+	// panic("pgfault not implemented");
 }
 
 //
@@ -53,9 +59,27 @@ duppage(envid_t envid, unsigned pn)
 {
 	int r;
 
-	// LAB 4: Your code here.
-	panic("duppage not implemented");
-	return 0;
+	if (pn * PGSIZE == UXSTACKTOP - PGSIZE)
+		return 0;
+
+	int perm_w = PTE_P | PTE_U | PTE_COW;
+	int perm_r = PTE_P | PTE_U;
+
+	void * addr = (void *) (pn * PGSIZE);
+	pte_t * vpte = 
+		(pte_t *)(PDX(UVPT) << 22 | PDX(addr) << 12 | PTX(addr) << 2);
+
+	if ((*vpte & PTE_W) || (*vpte & PTE_COW)){
+		if ((r = sys_page_map(sys_getenvid(), addr, envid, addr, perm_w)) < 0)
+			panic("duppage: map error!\n");
+		if ((r = sys_page_map(envid, addr, sys_getenvid(), addr, perm_w)) < 0)
+			panic("duppage: map error!\n");
+	} else {
+		if ((r = sys_page_map(sys_getenvid(), addr, envid, addr, perm_r)) < 0)
+			panic("duppage: map error!\n");
+	}
+	
+	return r;
 }
 
 //
@@ -77,8 +101,39 @@ duppage(envid_t envid, unsigned pn)
 envid_t
 fork(void)
 {
-	// LAB 4: Your code here.
-	panic("fork not implemented");
+	set_pgfault_handler(pgfault);
+	envid_t envid = sys_exofork();
+
+	if (envid < 0)
+		panic("something wrong when fork()\n");
+
+	if (envid == 0) {
+		//child
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0; 
+	}
+
+	sys_page_alloc(envid, (void *)UXSTACKTOP - PGSIZE, PTE_U | PTE_P | PTE_W);
+
+	int pn = 0;
+	for (; pn < UTOP / PGSIZE - 1; pn++) {
+
+		pde_t * vpde = 
+			(pde_t *)(PDX(UVPT) << 22 | PDX(UVPT) << 12 | PDX(pn * PGSIZE) << 2);
+		pte_t * vpte = 
+			(pte_t *)(PDX(UVPT) << 22 | PDX(pn * PGSIZE) << 12 | PTX(pn * PGSIZE) << 2);
+		if ((*vpde & PTE_P) && (*vpte & PTE_P) && (*vpte & PTE_U)) 
+			duppage(envid, pn);
+	}
+
+	extern void _pgfault_upcall(void);
+	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
+
+	int r;
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("sys_env_set_status: %e", r);
+
+	return envid;
 }
 
 // Challenge!

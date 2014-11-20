@@ -26,7 +26,7 @@ static struct Env *env_free_list;	// Free environment list
 // Set up global descriptor table (GDT) with separate segments for
 // kernel mode and user mode.  Segments serve many purposes on the x86.
 // We don't use any of their memory-mapping capabilities, but we need
-// them to switch privilege levels. 
+// them to switch privilege levels.
 //
 // The kernel and user segments are identical except for the DPL.
 // To load the SS register, the CPL must equal the DPL.  Thus,
@@ -49,7 +49,7 @@ struct Segdesc gdt[NCPU + 5] =
 
  	// 0x18 - user code segment
   [GD_UT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 3),
- 
+
   // 0x20 - user data segment
 	[GD_UD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 3),
 
@@ -166,7 +166,7 @@ env_init_percpu(void)
 static int
 env_setup_vm(struct Env *e)
 {
-	cprintf("env_setup_vm!\n");
+	//cprintf("env_setup_vm!\n");
 	int i;
 	struct PageInfo *p = NULL;
 
@@ -199,7 +199,7 @@ env_setup_vm(struct Env *e)
 		e->env_pgdir[i] = kern_pgdir[i];
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
-	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U | PTE_W;
+	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
 
 	return 0;
 }
@@ -215,7 +215,7 @@ env_setup_vm(struct Env *e)
 int
 env_alloc(struct Env **newenv_store, envid_t parent_id)
 {
-	cprintf("env_alloc!\n");
+	// cprintf("env_alloc!\n");
 	int32_t generation;
 	int r;
 	struct Env *e;
@@ -262,7 +262,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
-
+	e->env_tf.tf_eflags |= FL_IF;
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
 
@@ -296,25 +296,13 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   (Watch out for corner-cases!)
 	void *i;
 	for (i = ROUNDDOWN(va, PGSIZE); i < ROUNDUP(len + va, PGSIZE); i += PGSIZE) {
-		
-		// if ( (uint32_t)i == 0x00a3d000 || (uint32_t)i == 0x00a3c000) {
-		// 	cprintf("i is %08x\n", i);
-		// 	cprintf("e is %08x\n", e);
-		// 	cprintf("e->env_pgdir is %08x\n", e->env_pgdir);
-		// 	//cprintf("pp physical is %08x\n", page2kva(pp));
-		// 	cprintf("e->env_pgdir[i] is %08x\n", e->env_pgdir[PDX(i)]);
-		// 	//asm volatile("int $3");	
-		// }
 
 		struct PageInfo *pp = page_alloc(ALLOC_ZERO);
-		// cprintf("pp is %08x\n", page2kva(pp));
-		
+
 		if (!pp)
 			panic("No free pages for envs!");
 		page_insert(e->env_pgdir, pp, i, PTE_U | PTE_W);
-		// cprintf("region_alloc insert %08x\n", i);
 	}
-	//cprintf("regin_alloc! end!\n");
 }
 
 //
@@ -386,7 +374,7 @@ load_icode(struct Env *e, uint8_t *binary)
 		if (ph->p_type == ELF_PROG_LOAD) {
 			region_alloc(e, (void *)ph->p_va, ph->p_memsz);
 			int i = 0;
-			char * va = (char *)ph->p_va;			
+			char * va = (char *)ph->p_va;
 
 			// int j = 0;
 			// pte_t *pte = (pte_t *)page2kva(pa2page(PTE_ADDR(e->env_pgdir[0])));
@@ -399,7 +387,7 @@ load_icode(struct Env *e, uint8_t *binary)
 				//cprintf("binary[ph->p_offset + i] is %d\n", binary[ph->p_offset + i]);
 				va[i] = binary[ph->p_offset + i];
 			}
-			//cprintf("va is %08x, memsz is %08x, filesz is %08x\n", 
+			//cprintf("va is %08x, memsz is %08x, filesz is %08x\n",
 			//	ph->p_va, ph->p_memsz, ph->p_filesz);
 		}
 
@@ -407,6 +395,9 @@ load_icode(struct Env *e, uint8_t *binary)
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 	region_alloc(e, (void *)USTACKTOP - PGSIZE, PGSIZE);
+
+	// map one page for the user environment's exception stack
+	//region_alloc(e, (void *)UXSTACKTOP - PGSIZE, PGSIZE);
 	lcr3(PADDR(kern_pgdir));
 }
 
@@ -542,7 +533,7 @@ env_pop_tf(struct Trapframe *tf)
 void
 env_run(struct Env *e)
 {
-	cprintf("env_run!\n");
+	//cprintf("env_run!\n");
 	// Step 1: If this is a context switch (a new environment is running):
 	//	   1. Set the current environment (if any) back to
 	//	      ENV_RUNNABLE if it is ENV_RUNNING (think about
@@ -560,15 +551,16 @@ env_run(struct Env *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
-	if (curenv) 
+	if (curenv)
 		curenv->env_status = ENV_RUNNABLE;
 
 	curenv = e;
 	curenv->env_status = ENV_RUNNING;
 	curenv->env_runs++;
 	lcr3(PADDR(curenv->env_pgdir));
-	env_pop_tf(&curenv->env_tf);
+	unlock_kernel();
+
+	env_pop_tf(& curenv->env_tf);
 
 	while(1);
 }
-

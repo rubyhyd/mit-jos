@@ -14,9 +14,8 @@ libmain(int argc, char **argv)
 	extern char edata[], end[];
 	memset(edata, 0, end-edata);
 
-	thisenv = 0;
-	thisenv = &envs[0];
-	
+	thisenv = &envs[ENVX(sys_getenvid())];
+
 	// save the name of the program so that panic() can use it
 	if (argc > 0)
 		binaryname = argv[0];

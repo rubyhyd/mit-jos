@@ -64,7 +64,26 @@ TRAPHANDLER(H_T_PGFLT  , 14)
 TRAPHANDLER_NOEC(H_T_FPERR  , 16)		
 TRAPHANDLER(H_T_ALIGN  , 17)		
 TRAPHANDLER_NOEC(H_T_MCHK   , 18)		
-TRAPHANDLER_NOEC(H_T_SIMDERR, 19)		
+TRAPHANDLER_NOEC(H_T_SIMDERR, 19)
+
+TRAPHANDLER_NOEC(H_T_IRQ0 ,  32)		
+TRAPHANDLER_NOEC(H_T_IRQ1 ,  33)		
+TRAPHANDLER_NOEC(H_T_IRQ2 ,  34)		
+TRAPHANDLER_NOEC(H_T_IRQ3 ,  35)		
+TRAPHANDLER_NOEC(H_T_IRQ4 ,  36)		
+TRAPHANDLER_NOEC(H_T_IRQ5 ,  37)		
+TRAPHANDLER_NOEC(H_T_IRQ6 ,  38)		
+TRAPHANDLER_NOEC(H_T_IRQ7 ,  39)
+TRAPHANDLER_NOEC(H_T_IRQ8 ,  40)		
+TRAPHANDLER_NOEC(H_T_IRQ9 ,  41)		
+TRAPHANDLER_NOEC(H_T_IRQ10 ,  42)		
+TRAPHANDLER_NOEC(H_T_IRQ11 ,  43)		
+TRAPHANDLER_NOEC(H_T_IRQ12 ,  44)		
+TRAPHANDLER_NOEC(H_T_IRQ13 ,  45)		
+TRAPHANDLER_NOEC(H_T_IRQ14 ,  46)	
+TRAPHANDLER_NOEC(H_T_IRQ15 ,  47)		
+
+
 TRAPHANDLER_NOEC(H_T_SYSCALL, 48)
 /*
  * Lab 3: Your code here for _alltraps
@@ -74,7 +93,16 @@ TRAPHANDLER_NOEC(H_T_SYSCALL, 48)
  	pushl %ds
  	pushl %es
  	pushal
- 	
+
+ 	#to disable physical interrupts
+ 	pushfl
+ 	popl %eax
+ 	movl $(FL_IF), %ebx
+ 	notl %ebx
+ 	andl %ebx, %eax
+ 	pushl %eax
+ 	popfl
+
  	movl $GD_KD, %eax
  	movl %eax, %ds
  	movl %eax, %es

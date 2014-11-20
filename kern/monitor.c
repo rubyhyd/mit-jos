@@ -213,10 +213,8 @@ mon_dump(int argc, char** argv, struct Trapframe* tf){
 
 	if (type == 'v') {
 		cprintf("Virtual Memory Content:\n");
-
-		extern struct Env *curenv;
 		
-		pte = pgdir_walk(curenv->env_pgdir, (const void *)i, 0);
+		pte = pgdir_walk((pde_t *)UVPT, (const void *)i, 0);
 
 		for (; i < num * 4 + begin; i += 4 ) {
 			if ((i - 1) / PGSIZE != i / PGSIZE)
