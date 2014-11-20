@@ -40,8 +40,10 @@ sched_yield(void)
 
 	//cprintf("idle is %p\n", idle);
 
-	if (idle) 
+	if (idle) {
+		cprintf("run [%08x]...\n", idle->env_id);
 		env_run(idle);
+	}
 
 	// sched_halt never returns
 	sched_halt();

@@ -58,7 +58,6 @@ umain(int argc, char **argv)
   800052:	c7 04 24 18 15 80 00 	movl   $0x801518,(%esp)
   800059:	e8 7c 01 00 00       	call   8001da <cprintf>
   80005e:	eb fe                	jmp    80005e <umain+0x2a>
-		// asm volatile("int $3");
 		while (1);
 			/* do nothing */;
 	}
